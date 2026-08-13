@@ -40,7 +40,12 @@ jobs:
           # if the Worker is ever renamed or redeployed under a different name.
           VITE_SERVER_HOST: kim-kaylie-kibble-chase.renzocandano.workers.dev
       - name: Deploy to Cloudflare Pages
-        run: npx wrangler pages deploy dist --project-name=kim-kaylie-kibble-chase
+        # --branch=production is required here: the Pages project's production
+        # branch was set to the literal string "production" during initial setup
+        # (not "main"), and wrangler tags each deploy with whatever branch it's
+        # run from. Without this, CI deploys (running on git branch "main") land
+        # as preview deployments and never update the live pages.dev URL.
+        run: npx wrangler pages deploy dist --project-name=kim-kaylie-kibble-chase --branch=production
         working-directory: client
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
