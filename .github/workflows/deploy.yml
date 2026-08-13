@@ -1,0 +1,47 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install server dependencies
+        run: npm install
+        working-directory: server
+      - name: Deploy Worker (game server)
+        run: npx wrangler deploy
+        working-directory: server
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+  deploy-client:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install client dependencies
+        run: npm install
+        working-directory: client
+      - name: Build client
+        run: npm run build
+        working-directory: client
+        env:
+          # Public server hostname - not a secret, safe to hardcode. Update this
+          # if the Worker is ever renamed or redeployed under a different name.
+          VITE_SERVER_HOST: kim-kaylie-kibble-chase.renzocandano.workers.dev
+      - name: Deploy to Cloudflare Pages
+        run: npx wrangler pages deploy dist --project-name=kim-kaylie-kibble-chase
+        working-directory: client
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}

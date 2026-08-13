@@ -1,0 +1,3 @@
+{
+  "_deprecated": "No longer used. This project deploys via wrangler.toml (plain Cloudflare Workers + Durable Objects) after PartyKit's hosted deploy paths hit unresolved platform bugs. Kept only because the sandbox couldn't delete it - safe to delete by hand."
+}

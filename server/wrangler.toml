@@ -1,0 +1,14 @@
+name = "kim-kaylie-kibble-chase"
+main = "worker.js"
+compatibility_date = "2024-09-23"
+
+[[durable_objects.bindings]]
+name = "KIBBLE_ROOM"
+class_name = "KibbleChaseRoom"
+
+# This exact migration type (new_sqlite_classes, not new_classes) is required for
+# Durable Objects to work on Cloudflare's free plan. Getting this wrong is the bug
+# that broke PartyKit's own cloud-prem deploy - see README "Why this isn't PartyKit".
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["KibbleChaseRoom"]
