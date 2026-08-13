@@ -1,4 +1,4 @@
-import { COUNTDOWN_SECONDS, DISAPPEAR_MS, MIN_SPAWN_DISTANCE_TILES } from '../shared/gameConfig.js';
+import { COUNTDOWN_SECONDS, DISAPPEAR_MS, MIN_SPAWN_DISTANCE_TILES, MOVE_SPEED_TILES_PER_SEC } from '../shared/gameConfig.js';
 import { MAPS } from '../shared/maps.js';
 
 // Plain Cloudflare Worker + Durable Object implementation of the multiplayer room.
@@ -61,6 +61,37 @@ function allOpenTiles(map) {
 
 const OPEN_TILES = allOpenTiles(MAP);
 
+// "Medium difficulty" bot tuning: how often it ignores the optimal path to
+// kibble and picks a random open neighbor instead. Lower = harder bot (more
+// optimal), higher = easier bot (more mistakes). This is the only knob used
+// right now - a future "easy"/"hard" mode could just pass a different value in.
+const BOT_RANDOM_MOVE_CHANCE = 0.15;
+
+// Shortest-path (BFS) search from `start` to the nearest tile currently in
+// `kibbleSet`, returning only the first step of that path (the bot re-plans
+// every tick, so it always reacts to kibble the opponent just ate).
+function bfsNextStep(map, kibbleSet, start) {
+  const startKey = `${start[0]},${start[1]}`;
+  const visited = new Set([startKey]);
+  const queue = [{ pos: start, firstStep: null }];
+  while (queue.length) {
+    const { pos, firstStep } = queue.shift();
+    for (const [dx, dy] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+      const nx = pos[0] + dx;
+      const ny = pos[1] + dy;
+      const key = `${nx},${ny}`;
+      if (visited.has(key)) continue;
+      if (ny < 0 || ny >= map.rows || nx < 0 || nx >= map.cols) continue;
+      if (map.tiles[ny][nx] === '#') continue;
+      visited.add(key);
+      const step = firstStep || [nx, ny];
+      if (kibbleSet.has(key)) return step;
+      queue.push({ pos: [nx, ny], firstStep: step });
+    }
+  }
+  return null; // no reachable kibble left
+}
+
 export class KibbleChaseRoom {
   constructor(state, env) {
     this.state = state;
@@ -71,6 +102,8 @@ export class KibbleChaseRoom {
     this.kibble = allKibbleTiles(MAP);
     this.started = false;
     this.matchOver = false;
+    this.isBotMode = false;
+    this.botConnId = null;
   }
 
   async fetch(request) {
@@ -82,6 +115,8 @@ export class KibbleChaseRoom {
     const [client, server] = Object.values(pair);
     server.accept();
 
+    const wantsBot = new URL(request.url).searchParams.get('bot') === 'true';
+
     if (this.players.size >= 2) {
       server.send(JSON.stringify({ type: 'full' }));
       server.close(1000, 'Room full');
@@ -89,13 +124,40 @@ export class KibbleChaseRoom {
     }
 
     const connId = `c${this.nextConnId++}`;
-    this.onConnect(connId, server);
+    if (wantsBot && this.players.size === 0) {
+      this.handleBotModeConnect(connId, server);
+    } else {
+      this.onConnect(connId, server);
+    }
 
     server.addEventListener('message', (evt) => this.onMessage(connId, evt.data));
     server.addEventListener('close', () => this.onClose(connId));
     server.addEventListener('error', () => this.onClose(connId));
 
     return new Response(null, { status: 101, webSocket: client });
+  }
+
+  handleBotModeConnect(connId, ws) {
+    this.isBotMode = true;
+
+    const humanSpawn = this.spawnPair[0];
+    this.players.set(connId, { connId, ws, catId: 'kim', col: humanSpawn[0], row: humanSpawn[1], score: 0, alive: true, ready: false });
+
+    const botSpawn = this.spawnPair[1];
+    this.botConnId = 'bot';
+    this.players.set(this.botConnId, {
+      connId: this.botConnId,
+      ws: { send() {} }, // no real socket - moves are driven by startBotLoop() instead
+      catId: 'kaylie',
+      col: botSpawn[0],
+      row: botSpawn[1],
+      score: 0,
+      alive: true,
+      ready: true, // the bot never needs to click Ready
+      isBot: true
+    });
+
+    ws.send(JSON.stringify(this.welcomePayload('kim', humanSpawn, [{ catId: 'kaylie', col: botSpawn[0], row: botSpawn[1] }])));
   }
 
   onConnect(connId, ws) {
@@ -156,9 +218,37 @@ export class KibbleChaseRoom {
       } else {
         this.started = true;
         this.broadcast({ type: 'start' });
+        if (this.isBotMode) this.startBotLoop();
       }
     };
     setTimeout(tick, 1000);
+  }
+
+  startBotLoop() {
+    const intervalMs = 1000 / MOVE_SPEED_TILES_PER_SEC;
+    const tick = () => {
+      if (!this.started || this.matchOver) return; // match ended - stop rescheduling
+      this.stepBot();
+      setTimeout(tick, intervalMs);
+    };
+    setTimeout(tick, intervalMs);
+  }
+
+  stepBot() {
+    const bot = this.players.get(this.botConnId);
+    if (!bot || !bot.alive) return;
+
+    let next = null;
+    if (Math.random() < BOT_RANDOM_MOVE_CHANCE) {
+      const options = [[1, 0], [-1, 0], [0, 1], [0, -1]]
+        .map(([dx, dy]) => [bot.col + dx, bot.row + dy])
+        .filter(([c, r]) => r >= 0 && r < MAP.rows && c >= 0 && c < MAP.cols && MAP.tiles[r][c] !== '#');
+      if (options.length > 0) next = options[Math.floor(Math.random() * options.length)];
+    }
+    if (!next) next = bfsNextStep(MAP, this.kibble, [bot.col, bot.row]);
+    if (!next) return; // no reachable kibble - match is about to end anyway
+
+    this.handleMove(this.botConnId, bot, { col: next[0], row: next[1] });
   }
 
   handleMove(connId, player, msg) {
@@ -280,11 +370,28 @@ export class KibbleChaseRoom {
     this.started = false;
     this.matchOver = false;
 
-    survivors.forEach((old, i) => {
-      const catId = i === 0 ? 'kim' : 'kaylie';
-      const spawn = this.spawnPair[i];
-      this.players.set(old.connId, { connId: old.connId, ws: old.ws, catId, col: spawn[0], row: spawn[1], score: 0, alive: true, ready: false });
-      try { old.ws.send(JSON.stringify(this.welcomePayload(catId, spawn, []))); } catch { /* socket may already be closing */ }
+    // Assign fresh catId/spawn to every survivor first, then send each their
+    // 'welcome' listing the *other* survivors as existingPlayers - otherwise
+    // (e.g. in bot mode) a survivor's client would think it's alone in the room
+    // even though the bot is still sitting right there in this.players.
+    const reassigned = survivors.map((old, i) => ({
+      old,
+      catId: i === 0 ? 'kim' : 'kaylie',
+      spawn: this.spawnPair[i]
+    }));
+
+    reassigned.forEach(({ old, catId, spawn }) => {
+      // The bot is always immediately ready (it never clicks anything) - without
+      // this, a bot match would get stuck after the very first reset since
+      // nothing would ever set the bot's ready flag back to true.
+      this.players.set(old.connId, { connId: old.connId, ws: old.ws, catId, col: spawn[0], row: spawn[1], score: 0, alive: true, ready: !!old.isBot, isBot: old.isBot });
+    });
+
+    reassigned.forEach(({ old, catId, spawn }) => {
+      const existingPlayers = reassigned
+        .filter((other) => other.old.connId !== old.connId)
+        .map((other) => ({ catId: other.catId, col: other.spawn[0], row: other.spawn[1] }));
+      try { old.ws.send(JSON.stringify(this.welcomePayload(catId, spawn, existingPlayers))); } catch { /* socket may already be closing */ }
     });
   }
 

@@ -7,9 +7,10 @@
 
 const SERVER_HOST = import.meta.env.VITE_SERVER_HOST || 'localhost:8787';
 
-export function connectToRoom(roomId, onMessage) {
+export function connectToRoom(roomId, onMessage, opts = {}) {
   const protocol = location.protocol === 'https:' ? 'wss' : 'ws';
-  const socket = new WebSocket(`${protocol}://${SERVER_HOST}/party/${roomId}`);
+  const query = opts.bot ? '?bot=true' : '';
+  const socket = new WebSocket(`${protocol}://${SERVER_HOST}/party/${roomId}${query}`);
 
   socket.addEventListener('message', (event) => {
     const data = JSON.parse(event.data);

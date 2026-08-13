@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { TILE_SIZE, MOVE_SPEED_TILES_PER_SEC } from '../../../shared/gameConfig.js';
 import { connectToRoom } from '../net/partyClient.js';
 import { ensureCatTextures } from '../catSprites.js';
+import { startBackgroundMusic } from '../music.js';
 
 // GameScene: renders the map, both cats, and the ready/countdown/score UI, and
 // talks to the room server for kibble/collision/win authority. Movement itself
@@ -59,9 +60,49 @@ export default class GameScene extends Phaser.Scene {
 
     this.cursors = this.input.keyboard.createCursorKeys();
 
+    this.showModeMenu();
+  }
+
+  // Shown on load, before any server connection is made. The user picks Vs Bot
+  // (instant single-player match against a medium-difficulty bot) or Vs Player
+  // (the existing wait-for-opponent flow). Music starts here too, since this
+  // click is the first real user gesture and browsers block audio before that.
+  showModeMenu() {
+    const cx = this.scale.width / 2;
+    const cy = this.scale.height / 2;
+
+    const title = this.add.text(cx, cy - 60, 'Kim & Kaylie: Kibble Chase', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#f2c14e'
+    }).setOrigin(0.5).setDepth(10);
+
+    const botButton = this.add.text(cx, cy, '[ VS BOT ]', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#8fef7f', backgroundColor: '#222'
+    }).setPadding(10).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(10);
+
+    const playerButton = this.add.text(cx, cy + 50, '[ VS PLAYER ]', {
+      fontFamily: 'monospace', fontSize: '18px', color: '#8fef7f', backgroundColor: '#222'
+    }).setPadding(10).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(10);
+
+    const chooseMode = (isBot) => {
+      startBackgroundMusic();
+      title.destroy();
+      botButton.destroy();
+      playerButton.destroy();
+      this.connectAndPlay(isBot);
+    };
+
+    botButton.on('pointerdown', () => chooseMode(true));
+    playerButton.on('pointerdown', () => chooseMode(false));
+  }
+
+  connectAndPlay(isBot) {
     const params = new URLSearchParams(window.location.search);
-    const roomId = params.get('room') || 'local-test-room';
-    this.net = connectToRoom(roomId, (msg) => this.handleMessage(msg));
+    // Bot matches are always solo, so a fixed roomId would collide across
+    // simultaneous bot games on different tabs/players - use a fresh room each time.
+    const roomId = isBot
+      ? `bot-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      : (params.get('room') || 'local-test-room');
+    this.net = connectToRoom(roomId, (msg) => this.handleMessage(msg), { bot: isBot });
   }
 
   handleMessage(msg) {
