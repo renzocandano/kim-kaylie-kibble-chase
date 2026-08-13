@@ -14,7 +14,10 @@ const NOTE_HZ = {
 // Simple, pleasant 8-note loop - mellow major-key arpeggio, "elevator music" vibe.
 const SEQUENCE = ['C4', 'E4', 'G4', 'C5', 'G4', 'E4', 'D4', 'G4'];
 const NOTE_DURATION_SEC = 0.45;
-const MAX_VOLUME = 0.2; // 20/100 as requested
+// A square wave at gain 0.2 reads as much louder than "20/100" because square
+// waves are full of sharp harmonics - dropping the gain further and softening
+// the per-note peak (see playNote) gets it closer to an actual quiet 20/100 feel.
+const MAX_VOLUME = 0.06;
 
 let ctx = null;
 let masterGain = null;
@@ -34,13 +37,14 @@ function ensureContext() {
 
 function playNote(freq, whenSec) {
   const osc = ctx.createOscillator();
-  osc.type = 'square'; // classic 8-bit chiptune timbre
+  osc.type = 'triangle'; // softer than square - still reads as 8-bit, much gentler on the ear
   osc.frequency.value = freq;
 
-  // per-note envelope so notes don't click or blend into a drone
+  // per-note envelope so notes don't click or blend into a drone; peak eased
+  // down from 1 so it never hits full gain, keeping it genuinely background-quiet
   const noteGain = ctx.createGain();
   noteGain.gain.setValueAtTime(0, whenSec);
-  noteGain.gain.linearRampToValueAtTime(1, whenSec + 0.03);
+  noteGain.gain.linearRampToValueAtTime(0.6, whenSec + 0.03);
   noteGain.gain.linearRampToValueAtTime(0, whenSec + NOTE_DURATION_SEC * 0.9);
 
   osc.connect(noteGain);
