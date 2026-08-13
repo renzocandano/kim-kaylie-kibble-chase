@@ -16,17 +16,21 @@ function manhattan(a, b) {
   return Math.abs(a[0] - b[0]) + Math.abs(a[1] - b[1]);
 }
 
-function pickSpawnPair(spawnPoints) {
-  for (const a of spawnPoints) {
-    for (const b of spawnPoints) {
+// Picks two random open tiles at least MIN_SPAWN_DISTANCE_TILES apart. Used for
+// both initial spawn and every reset, so starting positions vary each match
+// instead of always being the same two corners.
+function pickSpawnPair(openTiles) {
+  const shuffled = [...openTiles].sort(() => Math.random() - 0.5);
+  for (const a of shuffled) {
+    for (const b of shuffled) {
       if (a === b) continue;
       if (manhattan(a, b) >= MIN_SPAWN_DISTANCE_TILES) return [a, b];
     }
   }
-  let best = [spawnPoints[0], spawnPoints[1]];
+  let best = [shuffled[0], shuffled[1]];
   let bestDist = -1;
-  for (const a of spawnPoints) {
-    for (const b of spawnPoints) {
+  for (const a of shuffled) {
+    for (const b of shuffled) {
       if (a === b) continue;
       const d = manhattan(a, b);
       if (d > bestDist) { bestDist = d; best = [a, b]; }
@@ -45,13 +49,25 @@ function allKibbleTiles(map) {
   return kibble;
 }
 
+function allOpenTiles(map) {
+  const tiles = [];
+  for (let row = 0; row < map.rows; row++) {
+    for (let col = 0; col < map.cols; col++) {
+      if (map.tiles[row][col] !== '#') tiles.push([col, row]);
+    }
+  }
+  return tiles;
+}
+
+const OPEN_TILES = allOpenTiles(MAP);
+
 export class KibbleChaseRoom {
   constructor(state, env) {
     this.state = state;
     this.env = env;
     this.players = new Map(); // connId -> { ws, catId, col, row, score, alive, ready }
     this.nextConnId = 1;
-    this.spawnPair = pickSpawnPair(MAP.spawnPoints);
+    this.spawnPair = pickSpawnPair(OPEN_TILES);
     this.kibble = allKibbleTiles(MAP);
     this.started = false;
     this.matchOver = false;
@@ -194,11 +210,13 @@ export class KibbleChaseRoom {
   }
 
   pickRespawnPoint(loserId) {
+    // Respawns anywhere on the open board, not just the original corner spawn
+    // points, so a stunned cat coming back feels genuinely random each time.
     const others = [...this.players.entries()].filter(([id]) => id !== loserId).map(([, p]) => p);
-    const candidates = MAP.spawnPoints.filter(([c, r]) =>
+    const candidates = OPEN_TILES.filter(([c, r]) =>
       !others.some(o => o.alive && o.col === c && o.row === r)
     );
-    const pool = candidates.length > 0 ? candidates : MAP.spawnPoints;
+    const pool = candidates.length > 0 ? candidates : OPEN_TILES;
     return pool[Math.floor(Math.random() * pool.length)];
   }
 
@@ -257,7 +275,7 @@ export class KibbleChaseRoom {
     // their client redraws into a clean lobby instead of being silently dropped.
     const survivors = [...this.players.values()];
     this.players.clear();
-    this.spawnPair = pickSpawnPair(MAP.spawnPoints);
+    this.spawnPair = pickSpawnPair(OPEN_TILES);
     this.kibble = allKibbleTiles(MAP);
     this.started = false;
     this.matchOver = false;

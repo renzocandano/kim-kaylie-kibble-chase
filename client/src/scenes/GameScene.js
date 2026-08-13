@@ -1,16 +1,22 @@
 import Phaser from 'phaser';
 import { TILE_SIZE, MOVE_SPEED_TILES_PER_SEC } from '../../../shared/gameConfig.js';
 import { connectToRoom } from '../net/partyClient.js';
+import { ensureCatTextures } from '../catSprites.js';
 
 // GameScene: renders the map, both cats, and the ready/countdown/score UI, and
-// talks to the PartyKit room for kibble/collision/win authority. Movement itself
+// talks to the room server for kibble/collision/win authority. Movement itself
 // is driven locally (grid tween) and reported to the server each time a tile
 // change completes.
 //
 // NOT implemented yet (see project README "Next steps"): bot AI, random map
-// selection among 5 maps, shareable match links, real pixel-art sprites.
+// selection among 5 maps, shareable match links.
 
-const CAT_COLORS = { kim: 0xd9822b, kaylie: 0xe0a458 };
+const RULES_TEXT =
+  'You win if you have eaten the most amount of kibble by the time all the kibble ' +
+  'is gone or if your opponent disconnected from the match. The game ends when ' +
+  'someone wins or someone loses. If you touch your opponent, whoever has eaten ' +
+  'fewer kibble will be stunned for a few seconds and then will randomly re-spawn. ' +
+  'Use the arrow keys to move.';
 
 export default class GameScene extends Phaser.Scene {
   constructor() {
@@ -31,8 +37,14 @@ export default class GameScene extends Phaser.Scene {
     this.myPos = { col: 0, row: 0 };
     this.scores = { kim: 0, kaylie: 0 };
 
+    ensureCatTextures(this);
+
     this.statusText = this.add.text(10, 10, 'Connecting...', { fontFamily: 'monospace', fontSize: '16px', color: '#ffffff' }).setDepth(10);
     this.scoreText = this.add.text(10, 30, '', { fontFamily: 'monospace', fontSize: '14px', color: '#ffffff' }).setDepth(10);
+
+    this.rulesText = this.add.text(0, 0, RULES_TEXT, {
+      fontFamily: 'monospace', fontSize: '11px', color: '#cfd8e3', align: 'center'
+    }).setOrigin(0.5, 1).setDepth(10).setVisible(false);
 
     this.readyButton = this.add.text(0, 0, '[ READY ]', { fontFamily: 'monospace', fontSize: '20px', color: '#8fef7f', backgroundColor: '#222' })
       .setPadding(10)
@@ -42,6 +54,7 @@ export default class GameScene extends Phaser.Scene {
       .on('pointerdown', () => {
         this.net.send({ type: 'ready' });
         this.readyButton.setText('[ WAITING FOR OPPONENT ]').disableInteractive();
+        this.rulesText.setVisible(false);
       });
 
     this.cursors = this.input.keyboard.createCursorKeys();
@@ -80,6 +93,7 @@ export default class GameScene extends Phaser.Scene {
           for (const p of existingPlayers) this.spawnCat(p.catId, p.col, p.row);
           this.statusText.setText('Both cats present. Click ready!');
           this.readyButton.setVisible(true);
+          this.rulesText.setVisible(true);
         } else {
           this.statusText.setText(`You are ${this.capitalize(this.myCatId)}. Waiting for opponent...`);
         }
@@ -89,9 +103,11 @@ export default class GameScene extends Phaser.Scene {
         this.spawnCat(msg.catId, msg.col, msg.row);
         this.statusText.setText('Both cats present. Click ready!');
         this.readyButton.setVisible(true);
+        this.rulesText.setVisible(true);
         break;
       case 'countdown':
         this.readyButton.setVisible(false);
+        this.rulesText.setVisible(false);
         this.statusText.setText(`Starting in ${msg.value}...`);
         break;
       case 'start':
@@ -142,6 +158,7 @@ export default class GameScene extends Phaser.Scene {
       case 'opponentLeft':
         this.statusText.setText('Opponent disconnected. Waiting for opponent...');
         this.readyButton.setText('[ READY ]').setVisible(false).setInteractive({ useHandCursor: true });
+        this.rulesText.setVisible(false);
         break;
       default:
         break;
@@ -154,6 +171,8 @@ export default class GameScene extends Phaser.Scene {
 
   positionReadyButton() {
     this.readyButton.setPosition(this.map.cols * TILE_SIZE / 2 - 90, this.map.rows * TILE_SIZE / 2 - 15);
+    this.rulesText.setWordWrapWidth(this.map.cols * TILE_SIZE - 40);
+    this.rulesText.setPosition(this.map.cols * TILE_SIZE / 2, this.readyButton.y - 20);
   }
 
   resetSceneState() {
@@ -174,6 +193,7 @@ export default class GameScene extends Phaser.Scene {
     this.aliveMe = true;
     this.isMoving = false;
     this.readyButton.setText('[ READY ]').setVisible(false).setInteractive({ useHandCursor: true });
+    this.rulesText.setVisible(false);
   }
 
   drawMap(map) {
@@ -201,10 +221,10 @@ export default class GameScene extends Phaser.Scene {
 
   spawnCat(catId, col, row) {
     if (this.sprites[catId]) return;
-    const rect = this.add.rectangle(
+    const rect = this.add.image(
       col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2,
-      TILE_SIZE * 0.7, TILE_SIZE * 0.7, CAT_COLORS[catId]
-    );
+      catId === 'kim' ? 'cat-kim' : 'cat-kaylie'
+    ).setDisplaySize(TILE_SIZE * 0.95, TILE_SIZE * 0.95);
     const label = this.add.text(rect.x, rect.y - TILE_SIZE * 0.7, catId === 'kim' ? 'K' : 'Ka', {
       fontFamily: 'monospace', fontSize: '12px', color: '#ffffff'
     }).setOrigin(0.5);
