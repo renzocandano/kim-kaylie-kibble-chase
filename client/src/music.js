@@ -17,7 +17,7 @@ const NOTE_DURATION_SEC = 0.45;
 // A square wave at gain 0.2 reads as much louder than "20/100" because square
 // waves are full of sharp harmonics - dropping the gain further and softening
 // the per-note peak (see playNote) gets it closer to an actual quiet 20/100 feel.
-const MAX_VOLUME = 0.06;
+const MAX_VOLUME = 0.012; // 1/5th of the previous 0.06, per user feedback
 
 let ctx = null;
 let masterGain = null;
