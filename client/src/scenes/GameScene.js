@@ -225,7 +225,7 @@ export default class GameScene extends Phaser.Scene {
       col * TILE_SIZE + TILE_SIZE / 2, row * TILE_SIZE + TILE_SIZE / 2,
       catId === 'kim' ? 'cat-kim' : 'cat-kaylie'
     ).setDisplaySize(TILE_SIZE * 0.95, TILE_SIZE * 0.95);
-    const label = this.add.text(rect.x, rect.y - TILE_SIZE * 0.7, catId === 'kim' ? 'K' : 'Ka', {
+    const label = this.add.text(rect.x, rect.y - TILE_SIZE * 0.7, catId === 'kim' ? 'Kim' : 'Kaylie', {
       fontFamily: 'monospace', fontSize: '12px', color: '#ffffff'
     }).setOrigin(0.5);
     this.sprites[catId] = { rect, label };
