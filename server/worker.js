@@ -65,7 +65,7 @@ const OPEN_TILES = allOpenTiles(MAP);
 // kibble and picks a random open neighbor instead. Lower = harder bot (more
 // optimal), higher = easier bot (more mistakes). This is the only knob used
 // right now - a future "easy"/"hard" mode could just pass a different value in.
-const BOT_RANDOM_MOVE_CHANCE = 0.15;
+const BOT_RANDOM_MOVE_CHANCE = 0.4; // raised from 0.15 - bot was too strong at that setting
 
 // Shortest-path (BFS) search from `start` to the nearest tile currently in
 // `kibbleSet`, returning only the first step of that path (the bot re-plans

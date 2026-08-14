@@ -1,78 +1,67 @@
-// Tiny, dependency-free 8-bit "elevator music" background loop, generated live
-// with the Web Audio API (no external audio files). Kept deliberately simple: a
-// short, gentle chord-arpeggio loop at low volume so it sits in the background
-// rather than competing with the game.
+// Background music: plays the user's own recording (client/public/audio/bg-music.mp3)
+// on a seamless loop via the Web Audio API. The source file was preprocessed
+// offline (silence trimmed, then the tail crossfaded into the head) so looping
+// it doesn't produce an audible click or repeat-pop at the seam.
 //
 // Must be started from inside a real user gesture (a click) - browsers block
 // audio from starting on its own. See GameScene's mode-select buttons.
 
-const NOTE_HZ = {
-  C4: 261.63, D4: 293.66, E4: 329.63, F4: 349.23, G4: 392.0, A4: 440.0, B4: 493.88,
-  C5: 523.25, D5: 587.33, E5: 659.25
-};
-
-// Simple, pleasant 8-note loop - mellow major-key arpeggio, "elevator music" vibe.
-const SEQUENCE = ['C4', 'E4', 'G4', 'C5', 'G4', 'E4', 'D4', 'G4'];
-const NOTE_DURATION_SEC = 0.45;
-// A square wave at gain 0.2 reads as much louder than "20/100" because square
-// waves are full of sharp harmonics - dropping the gain further and softening
-// the per-note peak (see playNote) gets it closer to an actual quiet 20/100 feel.
-const MAX_VOLUME = 0.012; // 1/5th of the previous 0.06, per user feedback
+const MUSIC_URL = '/audio/bg-music.mp3';
+// 5/100 on the same 0-100 scale used for the original chiptune loop (which was
+// 20/100 there). This is a real recording rather than a synthesized tone, so
+// the same numeric gain will sound different, but this is the requested value.
+const VOLUME = 0.05;
 
 let ctx = null;
 let masterGain = null;
-let loopTimer = null;
-let stepIndex = 0;
+let audioBuffer = null;
+let sourceNode = null;
 let playing = false;
+let loadPromise = null;
 
 function ensureContext() {
   if (!ctx) {
     ctx = new (window.AudioContext || window.webkitAudioContext)();
     masterGain = ctx.createGain();
-    masterGain.gain.value = MAX_VOLUME;
+    masterGain.gain.value = VOLUME;
     masterGain.connect(ctx.destination);
   }
   return ctx;
 }
 
-function playNote(freq, whenSec) {
-  const osc = ctx.createOscillator();
-  osc.type = 'triangle'; // softer than square - still reads as 8-bit, much gentler on the ear
-  osc.frequency.value = freq;
-
-  // per-note envelope so notes don't click or blend into a drone; peak eased
-  // down from 1 so it never hits full gain, keeping it genuinely background-quiet
-  const noteGain = ctx.createGain();
-  noteGain.gain.setValueAtTime(0, whenSec);
-  noteGain.gain.linearRampToValueAtTime(0.6, whenSec + 0.03);
-  noteGain.gain.linearRampToValueAtTime(0, whenSec + NOTE_DURATION_SEC * 0.9);
-
-  osc.connect(noteGain);
-  noteGain.connect(masterGain);
-  osc.start(whenSec);
-  osc.stop(whenSec + NOTE_DURATION_SEC);
-}
-
-function scheduleNext() {
-  if (!playing) return;
-  const note = SEQUENCE[stepIndex % SEQUENCE.length];
-  playNote(NOTE_HZ[note], ctx.currentTime);
-  stepIndex += 1;
-  loopTimer = setTimeout(scheduleNext, NOTE_DURATION_SEC * 1000);
+async function loadBuffer() {
+  if (audioBuffer) return audioBuffer;
+  if (!loadPromise) {
+    loadPromise = fetch(MUSIC_URL)
+      .then((res) => res.arrayBuffer())
+      .then((data) => ctx.decodeAudioData(data))
+      .then((buf) => { audioBuffer = buf; return buf; });
+  }
+  return loadPromise;
 }
 
 // Starts the background loop. Safe to call multiple times - a no-op if already
 // playing. Must be called from within a user gesture handler (e.g. a click).
-export function startBackgroundMusic() {
+export async function startBackgroundMusic() {
   if (playing) return;
-  ensureContext();
-  if (ctx.state === 'suspended') ctx.resume();
   playing = true;
-  scheduleNext();
+  ensureContext();
+  if (ctx.state === 'suspended') await ctx.resume();
+
+  const buf = await loadBuffer();
+  if (!playing) return; // stopBackgroundMusic() may have been called while loading
+
+  sourceNode = ctx.createBufferSource();
+  sourceNode.buffer = buf;
+  sourceNode.loop = true;
+  sourceNode.connect(masterGain);
+  sourceNode.start(0);
 }
 
 export function stopBackgroundMusic() {
   playing = false;
-  if (loopTimer) clearTimeout(loopTimer);
-  loopTimer = null;
+  if (sourceNode) {
+    try { sourceNode.stop(); } catch { /* already stopped */ }
+    sourceNode = null;
+  }
 }
