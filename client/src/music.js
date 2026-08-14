@@ -45,17 +45,25 @@ async function loadBuffer() {
 export async function startBackgroundMusic() {
   if (playing) return;
   playing = true;
-  ensureContext();
-  if (ctx.state === 'suspended') await ctx.resume();
+  try {
+    ensureContext();
+    if (ctx.state === 'suspended') await ctx.resume();
 
-  const buf = await loadBuffer();
-  if (!playing) return; // stopBackgroundMusic() may have been called while loading
+    const buf = await loadBuffer();
+    if (!playing) return; // stopBackgroundMusic() may have been called while loading
 
-  sourceNode = ctx.createBufferSource();
-  sourceNode.buffer = buf;
-  sourceNode.loop = true;
-  sourceNode.connect(masterGain);
-  sourceNode.start(0);
+    sourceNode = ctx.createBufferSource();
+    sourceNode.buffer = buf;
+    sourceNode.loop = true;
+    sourceNode.connect(masterGain);
+    sourceNode.start(0);
+  } catch (err) {
+    // Previously this failure was silent (an unhandled rejection with no visible
+    // error and `playing` stuck true forever, blocking any retry). Log it and
+    // reset state so at least it's diagnosable and a fresh page load can retry.
+    console.error('[music] failed to start background music:', err);
+    playing = false;
+  }
 }
 
 export function stopBackgroundMusic() {
