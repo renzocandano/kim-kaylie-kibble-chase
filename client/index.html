@@ -4,12 +4,30 @@
   <meta charset="UTF-8" />
   <title>Kim &amp; Kaylie: Kibble Chase</title>
   <style>
-    html, body { margin: 0; background: #111; height: 100%; display: flex; align-items: center; justify-content: center; }
+    html, body { margin: 0; background: #111; height: 100%; }
+    body { display: flex; flex-direction: column; align-items: center; }
     #game-container { image-rendering: pixelated; }
+    .site-nav {
+      font-family: monospace; font-size: 14px; display: flex; gap: 6px;
+      padding: 10px 0 6px;
+    }
+    .site-nav a {
+      color: #8fef7f; text-decoration: none; background: #222; padding: 6px 14px;
+      border: 1px solid #333;
+    }
+    .site-nav a.active { color: #f2c14e; border-color: #f2c14e; }
+    .site-nav a:hover { background: #2a2a2a; }
+    .game-wrap { flex: 1; display: flex; align-items: center; justify-content: center; }
   </style>
 </head>
 <body>
-  <div id="game-container"></div>
+  <nav class="site-nav">
+    <a href="/" class="active">[ Game ]</a>
+    <a href="/about.html">[ About Me ]</a>
+  </nav>
+  <div class="game-wrap">
+    <div id="game-container"></div>
+  </div>
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>

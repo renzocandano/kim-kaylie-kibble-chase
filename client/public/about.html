@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>About - Kim &amp; Kaylie: Kibble Chase</title>
+  <style>
+    html, body {
+      margin: 0; background: #111; color: #e8e8e8;
+      font-family: monospace; min-height: 100%;
+    }
+    body { display: flex; flex-direction: column; align-items: center; }
+    .site-nav {
+      font-size: 14px; display: flex; gap: 6px;
+      padding: 10px 0 6px;
+    }
+    .site-nav a {
+      color: #8fef7f; text-decoration: none; background: #222; padding: 6px 14px;
+      border: 1px solid #333;
+    }
+    .site-nav a.active { color: #f2c14e; border-color: #f2c14e; }
+    .site-nav a:hover { background: #2a2a2a; }
+
+    main { max-width: 640px; padding: 10px 20px 60px; }
+
+    h1 { color: #f2c14e; font-size: 22px; text-align: center; margin: 10px 0 4px; }
+    .subtitle { text-align: center; color: #9aa; font-size: 13px; margin-bottom: 30px; }
+
+    .cats { display: flex; gap: 20px; justify-content: center; flex-wrap: wrap; margin-bottom: 30px; }
+    .cat-card { text-align: center; }
+    .cat-card img {
+      width: 200px; height: 200px; object-fit: cover;
+      border: 3px solid #333; image-rendering: auto;
+    }
+    .cat-card p { color: #8fef7f; margin-top: 8px; font-size: 15px; }
+
+    section { margin-bottom: 28px; line-height: 1.6; font-size: 14px; }
+    section h2 { color: #f2c14e; font-size: 15px; border-bottom: 1px solid #333; padding-bottom: 6px; }
+
+    .credit { text-align: center; font-size: 13px; color: #cfd8e3; margin-top: 10px; }
+    .credit a { color: #8fef7f; }
+  </style>
+</head>
+<body>
+  <nav class="site-nav">
+    <a href="/">[ Game ]</a>
+    <a href="/about.html" class="active">[ About Me ]</a>
+  </nav>
+
+  <main>
+    <h1>About Kim &amp; Kaylie: Kibble Chase</h1>
+    <p class="subtitle">A Pac-Man-esque kibble-eating chase, starring two real cats.</p>
+
+    <div class="cats">
+      <div class="cat-card">
+        <img src="/images/kim.jpg" alt="Kim the cat" />
+        <p>Kim</p>
+      </div>
+      <div class="cat-card">
+        <img src="/images/kaylie.jpg" alt="Kaylie the cat" />
+        <p>Kaylie</p>
+      </div>
+    </div>
+
+    <section>
+      <h2>What is this?</h2>
+      <p>
+        Kim &amp; Kaylie: Kibble Chase is a simple, 2D, 8-bit-style, Pac-Man-esque
+        browser game based on my two real cats, Kim and Kaylie. Two cats race
+        around a maze eating kibble - whoever eats the most wins, and bumping
+        into your opponent stuns whichever cat has eaten less. Play solo against
+        a computer-controlled cat, or against a friend online.
+      </p>
+    </section>
+
+    <section>
+      <h2>How it was made</h2>
+      <p>
+        This game was built through a conversation with Claude, Anthropic's AI
+        assistant - no prior coding done by hand. The visuals run on a game
+        toolkit called Phaser; the multiplayer matches are refereed by a small
+        server running on Cloudflare; and every update gets automatically
+        published to this live site within a minute or two of being made,
+        without needing to touch a terminal.
+      </p>
+    </section>
+
+    <p class="credit">
+      Created by Renzo Candano with Claude.<br />
+      Contact: <a href="mailto:renzocandano@gmail.com">renzocandano@gmail.com</a>
+    </p>
+  </main>
+</body>
+</html>
